@@ -1,0 +1,62 @@
+name: homelab
+
+services:
+  # ---------- Control panel for all containers ----------
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"                       # web UI
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # lets Portainer see Docker
+      - portainer_data:/data              # remembers your settings
+
+  # ---------- Network-wide ad blocker ----------
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"                       # DNS (the important one)
+      - "53:53/udp"
+      - "8081:80/tcp"                     # admin web page → host port 8081
+    environment:
+      TZ: "Asia/Kolkata"
+      FTLCONF_webserver_api_password: "${PIHOLE_PASSWORD}"   # from .env
+      FTLCONF_dns_listeningMode: "all"    # answer devices on your LAN
+    volumes:
+      - pihole_config:/etc/pihole         # keeps your blocklists + settings
+    cap_add:
+      - NET_ADMIN
+
+  # ---------- Your private cloud ----------
+  nextcloud:
+    image: nextcloud:apache
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8080:80"                         # web UI
+    environment:
+      NEXTCLOUD_ADMIN_USER: "${NEXTCLOUD_ADMIN_USER}"
+      NEXTCLOUD_ADMIN_PASSWORD: "${NEXTCLOUD_ADMIN_PASSWORD}"
+      NEXTCLOUD_TRUSTED_DOMAINS: "localhost 127.0.0.1 ${HOST_IP}"
+    volumes:
+      - nextcloud_data:/var/www/html      # your uploaded files live here
+
+  # ---------- Watchdog / status dashboard ----------
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"                       # web UI
+    volumes:
+      - uptime_data:/app/data             # remembers your monitors
+
+# Named volumes = Docker-managed storage that survives restarts
+volumes:
+  portainer_data:
+  pihole_config:
+  nextcloud_data:
+  uptime_data:
